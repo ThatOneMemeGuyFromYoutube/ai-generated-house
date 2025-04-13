@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Optimized 3D House</title>
+    <style>body { margin: 0; } canvas { display: block; }</style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+
+    <script>
+        let camera, controls, scene, renderer;
+        const objects = [];
+        
+        init();
+        animate();
+
+        async function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 50);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            await createOptimizedHouse();
+            addEssentialLighting();
+            addBasicFurniture();
+
+            camera.position.set(0, 1.6, 0);
+            controls = new THREE.PointerLockControls(camera, document.body);
+            scene.add(controls.getObject());
+
+            addEventListeners();
+        }
+
+        async function createOptimizedHouse() {
+            // Load compressed texture (1k resolution)
+            const textureLoader = new THREE.TextureLoader();
+            const floorTexture = await textureLoader.loadAsync('https://threejs.org/examples/textures/floor/wood_floor_01_diff_1k.jpg');
+            floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+            floorTexture.repeat.set(4, 4);
+
+            // Merged floor + ceiling geometry
+            const roomGeometry = new THREE.BoxGeometry(20, 4, 20);
+            const roomMaterial = new THREE.MeshStandardMaterial({
+                map: floorTexture,
+                side: THREE.BackSide
+            });
+            const room = new THREE.Mesh(roomGeometry, roomMaterial);
+            room.position.y = 2;
+            room.castShadow = room.receiveShadow = true;
+            scene.add(room);
+
+            // Optimized window (shared material)
+            const windowMaterial = new THREE.MeshStandardMaterial({
+                color: 0x87CEEB,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const window = new THREE.Mesh(
+                new THREE.PlaneGeometry(3, 2),
+                windowMaterial
+            );
+            window.position.set(0, 2, -9.95);
+            scene.add(window);
+        }
+
+        function addEssentialLighting() {
+            // Single directional light with optimized shadow
+            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+            sun.position.set(5, 5, 5);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 1024;
+            sun.shadow.mapSize.height = 1024;
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 20;
+            scene.add(sun);
+
+            // Ambient light for base illumination
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        }
+
+        function addBasicFurniture() {
+            // Shared material for all furniture
+            const furnitureMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4d3716,
+                roughness: 0.8
+            });
+
+            // Merged table geometry
+            const table = new THREE.Group();
+            
+            const tableTop = new THREE.Mesh(
+                new THREE.CylinderGeometry(1, 1, 0.2, 16),
+                furnitureMaterial
+            );
+            tableTop.position.y = 1;
+            
+            const tableLeg = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.1, 1, 8),
+                furnitureMaterial
+            );
+            
+            table.add(tableTop, tableLeg);
+            table.position.set(0, 0, -5);
+            scene.add(table);
+
+            // Optimized sofa (low-poly)
+            const sofaGeometry = new THREE.BoxGeometry(4, 1, 2);
+            const sofa = new THREE.Mesh(sofaGeometry, furnitureMaterial);
+            sofa.position.set(-6, 0.5, -5);
+            scene.add(sofa);
+        }
+
+        function addEventListeners() {
+            document.addEventListener('click', () => controls.lock());
+            
+            const keys = {};
+            document.addEventListener('keydown', e => keys[e.code] = true);
+            document.addEventListener('keyup', e => keys[e.code] = false);
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = innerWidth / innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(innerWidth, innerHeight);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Simplified movement system
+            const speed = 0.12;
+            if(controls.isLocked) {
+                if(keys.KeyW) controls.moveForward(speed);
+                if(keys.KeyS) controls.moveForward(-speed);
+                if(keys.KeyA) controls.moveRight(-speed);
+                if(keys.KeyD) controls.moveRight(speed);
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
